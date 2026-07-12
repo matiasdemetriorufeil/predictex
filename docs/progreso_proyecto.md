@@ -1,0 +1,75 @@
+# Progreso — Sistema de Predicción Brasileirão Série A
+
+Última actualización: 2026-07-12
+Referencia completa del plan: `docs/plan_maestro.md`
+
+**Próximo paso: 1.2**
+
+---
+
+## Fase 0 — Fundamentos y entorno
+- [x] 0.1 Estructura de repositorio + gestor de dependencias (uv)
+- [x] 0.2 Docker Compose: PostgreSQL + configuración tipada de variables de entorno
+- [x] 0.3 Logging y jerarquía de excepciones estándar del proyecto
+- [x] 0.4 CI básico (GitHub Actions) corriendo pytest en cada push
+
+## Fase 1 — Diseño de la base de datos (core)
+- [x] 1.1 Esquema relacional core: Teams, Seasons, Venues, Matches, Season_Teams (`docs/schema_core.md`)
+- [ ] 1.2 Modelos ORM (SQLAlchemy) + migración inicial con Alembic (fusionados: Alembic autogenera desde los modelos, no al revés)
+- [ ] 1.3 Script de validación del esquema (sanity checks)
+
+## Fase 2 — Ingesta de datos históricos (bootstrap)
+- [ ] 2.1 Importación de dataset histórico (Kaggle/GitHub)
+- [ ] 2.2 Cliente API football-data.org (fixtures, resultados, tabla)
+- [ ] 2.3 Cliente API-Football (stats de equipo, lineups)
+- [ ] 2.4 Normalización de nombres/IDs de equipos entre fuentes
+- [ ] 2.5 Script de ingesta incremental (partidos nuevos, programable)
+
+## Fase 3 — Datos complementarios de bajo costo
+- [ ] 3.1 Cliente OpenWeatherMap (clima por partido)
+- [ ] 3.2 Cliente Google Maps Distance Matrix (distancias, con caché)
+- [ ] 3.3 Cálculo de contexto/motivación (tabla, descenso, Libertadores)
+- [ ] 3.4 Cliente The Odds API (cuotas de cierre, anti-leakage)
+
+## Fase 4 — Limpieza y validación de datos
+- [ ] 4.1 Pipeline de integridad (duplicados, nulos, inconsistencias)
+- [ ] 4.2 Estrategia de datos faltantes (documentada)
+- [ ] 4.3 Tests automatizados de calidad de datos
+
+## Fase 5 — Feature engineering baseline
+- [ ] 5.1 ELO rating ajustado por localía
+- [ ] 5.2 Forma reciente (últimos 3/5/10, local/visitante)
+- [ ] 5.3 Descanso y fatiga (días entre partidos, viajes)
+- [ ] 5.4 Tabla `ModelFeatures` versionada
+
+## Fase 6 — Modelo baseline
+- [ ] 6.1 Modelo Dixon-Coles / Poisson bivariado
+- [ ] 6.2 Framework de walk-forward validation
+- [ ] 6.3 Métricas: log-loss, Brier score, calibración, benchmark vs mercado
+- [ ] 6.4 Backtesting histórico completo
+
+## Fase 7 — Modelos avanzados y ensemble
+- [ ] 7.1 Features avanzadas propias (validadas contra baseline)
+- [ ] 7.2 Modelo de clasificación (LightGBM/XGBoost) para 1X2
+- [ ] 7.3 Análisis SHAP y poda de variables
+- [ ] 7.4 Ensemble (stacking): Poisson + LightGBM + ELO
+- [ ] 7.5 Calibración final de probabilidades
+
+## Fase 8 — Simulación y mercados adicionales
+- [ ] 8.1 Simulación Monte Carlo (marcador exacto, over/under, BTTS)
+- [ ] 8.2 Intervalos de confianza / incertidumbre
+
+## Fase 9 — API del sistema
+- [ ] 9.1 API REST con FastAPI (endpoints de predicción)
+- [ ] 9.2 Endpoint de explicación (SHAP por partido)
+- [ ] 9.3 Documentación automática (OpenAPI/Swagger)
+- [ ] 9.4 Autenticación básica / rate limiting
+
+## Fase 10 — Automatización y monitoreo (MLOps ligero)
+- [ ] 10.1 Scheduler de ingesta y recálculo de features
+- [ ] 10.2 Reentrenamiento periódico + versionado de modelos (MLflow)
+- [ ] 10.3 Monitoreo de performance en producción (drift, calibración)
+
+## Fase 11 — Frontend (opcional, futuro)
+- [ ] 11.1 Dashboard simple (Streamlit) de predicciones
+- [ ] 11.2 Historial de predicciones vs resultados reales

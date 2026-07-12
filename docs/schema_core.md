@@ -3,11 +3,15 @@
 ## Alcance
 
 Este documento define únicamente las tablas **fundacionales** del esquema relacional:
-`teams`, `seasons`, `venues`, `matches`, más dos tablas de soporte para el mapeo de IDs
-externos (`team_external_ids`, `match_external_ids`) que surgen de una decisión de diseño
-explicada abajo. **No** es el esquema completo de 8 capas del plan maestro — el resto se
-agrega en fases posteriores a medida que se ingieren esos datos (clima, distancias, cuotas,
-features, etc.).
+`teams`, `seasons`, `venues`, `matches`, más `season_teams` (participantes confirmados por
+temporada) y dos tablas de soporte para el mapeo de IDs externos (`team_external_ids`,
+`match_external_ids`) que surgen de una decisión de diseño explicada abajo. **No** es el
+esquema completo de 8 capas del plan maestro — el resto se agrega en fases posteriores a
+medida que se ingieren esos datos (clima, distancias, cuotas, features, etc.).
+
+> Este documento incluye una ronda de revisión: las preguntas originales quedaron
+> resueltas y estas versiones de las tablas ya reflejan esas decisiones (ver
+> "Decisiones de diseño (post-revisión)" al final).
 
 Es puramente un documento de diseño: no hay SQL, migraciones de Alembic ni modelos
 SQLAlchemy todavía. Eso es Paso 1.2 y 1.3 respectivamente, y no deberían implementarse hasta
@@ -65,6 +69,22 @@ Constraints: `UNIQUE(team_id, source)` (un equipo tiene a lo sumo un ID por fuen
 | `end_date` | DATE | YES | | Fecha de fin. Nullable mientras la temporada está en curso. |
 | `status` | VARCHAR(20) | NO | | `planned` / `in_progress` / `finished`. |
 
+### `season_teams`
+
+Tabla de participantes confirmados de cada temporada. Sin ella, "el equipo no tiene partidos
+cargados todavía" y "el equipo no jugó esta Série A" son indistinguibles — ambigüedad que se
+filtraría silenciosamente a features de temporada (tabla de posiciones, motivación por
+descenso, etc.). Se agrega ahora porque es barata de incluir desde el día 1 y cara de
+introducir después sobre datos ya cargados.
+
+| Columna | Tipo | Nullable | Key | Descripción |
+|---|---|---|---|---|
+| `id` | BIGINT | NO | PK | Identificador interno. |
+| `season_id` | BIGINT | NO | FK → `seasons.id` | Temporada. |
+| `team_id` | BIGINT | NO | FK → `teams.id` | Equipo confirmado como participante de esa temporada. |
+
+Constraint: `UNIQUE(season_id, team_id)`.
+
 ### `venues`
 
 | Columna | Tipo | Nullable | Key | Descripción |
@@ -73,8 +93,8 @@ Constraints: `UNIQUE(team_id, source)` (un equipo tiene a lo sumo un ID por fuen
 | `name` | VARCHAR(150) | NO | | Nombre del estadio. |
 | `city` | VARCHAR(100) | NO | | Ciudad donde está ubicado. |
 | `capacity` | INTEGER | YES | | Capacidad de público, si se conoce. |
-| `latitude` | NUMERIC(9,6) | NO | | Para cálculo de distancias vía Google Maps en Fase 3. |
-| `longitude` | NUMERIC(9,6) | NO | | Ídem. |
+| `latitude` | NUMERIC(9,6) | YES | | Para cálculo de distancias vía Google Maps en Fase 3. Nullable: la ingesta de fixtures no debe bloquearse esperando geocodificación — se completa después de forma asíncrona en Fase 3. |
+| `longitude` | NUMERIC(9,6) | YES | | Ídem. |
 | `altitude_meters` | NUMERIC(6,1) | YES | | Altitud sobre el nivel del mar. Relevante como posible feature de condiciones extremas de sede (ej. Cuiabá) en Fase 3/5. |
 
 ### `matches`
@@ -88,16 +108,19 @@ Constraints: `UNIQUE(team_id, source)` (un equipo tiene a lo sumo un ID por fuen
 | `home_team_id` | BIGINT | NO | FK → `teams.id` | Equipo local. |
 | `away_team_id` | BIGINT | NO | FK → `teams.id` | Equipo visitante. |
 | `venue_id` | BIGINT | YES | FK → `venues.id` | Sede del partido. Nullable si el fixture se crea antes de confirmarse la sede. |
-| `status` | VARCHAR(20) | NO | | `scheduled` / `finished` / `postponed` / `cancelled`. Default `scheduled`. |
+| `status` | VARCHAR(20) | NO | | Ciclo de vida del fixture: `scheduled` / `finished` / `postponed` / `cancelled`. Default `scheduled`. |
+| `result_type` | VARCHAR(20) | NO | | Cómo se determinó el resultado, independiente de `status`: `played` (default) / `awarded_home` / `awarded_away` / `annulled`. Separa un resultado jugado de uno decidido administrativamente (W.O., sanción del STJD), para que no contamine sin distinción el modelo de goles esperados en Fase 6. |
+| `leg` | SMALLINT | NO | | Número de instancia del enfrentamiento dentro de la misma jornada. Default `1`; solo sube de 1 en el caso raro de un partido re-disputado. |
+| `replay_of_match_id` | BIGINT | YES | FK → `matches.id` | Si este partido es la re-disputa de otro (anulado por el STJD), apunta al partido original. Nullable en el caso normal (no es replay de nada). |
 | `home_score` | SMALLINT | YES | | Nullable hasta que el partido termine. |
 | `away_score` | SMALLINT | YES | | Ídem. |
 
-Constraints propuestas: `CHECK (home_team_id <> away_team_id)`, y un constraint único
-tentativo `UNIQUE (season_id, matchday, home_team_id, away_team_id)` para detectar
-duplicados al ingerir de múltiples fuentes — **con la salvedad discutida en "Preguntas
-abiertas" de que este supuesto puede romperse en casos reales** (partidos re-disputados por
-decisión administrativa), así que no debe tratarse como una garantía absoluta sin
-validación adicional a nivel aplicación.
+Constraints: `CHECK (home_team_id <> away_team_id)`, y
+`UNIQUE (season_id, matchday, home_team_id, away_team_id, leg)` para detectar duplicados al
+ingerir de múltiples fuentes. El campo `leg` absorbe el caso de partidos re-disputados
+(precedente real: escándalo de manipulación de resultados de 2005, con partido replayed) sin
+necesidad de romper el constraint — en el caso normal siempre vale `1` y el constraint se
+comporta igual que antes.
 
 ### `match_external_ids`
 
@@ -128,12 +151,15 @@ información del futuro hacia el pasado.
 ```mermaid
 erDiagram
     SEASONS ||--o{ MATCHES : "programa"
+    SEASONS ||--o{ SEASON_TEAMS : "tiene participantes"
+    TEAMS ||--o{ SEASON_TEAMS : "participa en"
     VENUES ||--o{ MATCHES : "es sede de"
     VENUES ||--o{ TEAMS : "es estadio principal de"
     TEAMS ||--o{ MATCHES : "juega de local (home_team_id)"
     TEAMS ||--o{ MATCHES : "juega de visitante (away_team_id)"
     TEAMS ||--o{ TEAM_EXTERNAL_IDS : "tiene"
     MATCHES ||--o{ MATCH_EXTERNAL_IDS : "tiene"
+    MATCHES ||--o{ MATCHES : "es replay de (replay_of_match_id)"
 
     TEAMS {
         bigint id PK
@@ -162,6 +188,12 @@ erDiagram
         varchar status
     }
 
+    SEASON_TEAMS {
+        bigint id PK
+        bigint season_id FK
+        bigint team_id FK
+    }
+
     MATCHES {
         bigint id PK
         bigint season_id FK
@@ -171,6 +203,9 @@ erDiagram
         bigint away_team_id FK
         bigint venue_id FK
         varchar status
+        varchar result_type
+        smallint leg
+        bigint replay_of_match_id FK
         smallint home_score
         smallint away_score
     }
@@ -190,53 +225,42 @@ erDiagram
     }
 ```
 
-## Preguntas abiertas / decisiones que requieren validación
+## Decisiones de diseño (post-revisión)
 
-1. **Ascenso/descenso de equipos**: `teams` no está atada a una temporada ni a una división
-   (la participación en una temporada de Série A queda implícita por aparecer en `matches`
-   de esa `season_id`). Esto resuelve naturalmente el caso de un equipo que desciende y
-   vuelve a subir — sigue siendo el mismo `id`. Pero: **¿necesitamos una tabla explícita
-   `season_teams` (participantes confirmados de cada temporada)**, en vez de inferir
-   participación solo a partir de si el equipo tiene partidos cargados? Sin ella, no hay
-   forma de distinguir "este equipo no jugó Série A esta temporada" de "todavía no cargamos
-   sus partidos".
+Las siguientes preguntas se plantearon en la primera versión de este documento y ya fueron
+resueltas. Se deja el registro de la decisión y su razón, no solo el resultado, para no tener
+que re-litigarlas más adelante.
 
-2. **Cambio de nombre o fusión de clubes**: si un club cambia de nombre oficial (ha pasado
-   en el fútbol brasileño) o se fusiona con otro, `teams.official_name` tal como está
-   diseñado se sobrescribiría in-place, perdiendo la referencia histórica correcta para
-   partidos viejos. ¿Versionamos nombres (tabla `team_name_history` con rango de vigencia) o
-   aceptamos que el nombre actual se aplica retroactivamente a todo el historial? Es una
-   decisión de negocio, no la resolví.
+1. **Ascenso/descenso de equipos → se agrega `season_teams`.** Sin ella, "el equipo no jugó
+   esta Série A" y "todavía no cargamos sus partidos" son indistinguibles, y esa ambigüedad
+   se filtraría en silencio a cualquier feature que dependa de "quiénes participan esta
+   temporada" (tabla de posiciones, motivación por descenso). Es barata de agregar ahora,
+   cara de introducir después sobre datos ya cargados. Ver tabla `season_teams` arriba.
 
-3. **Duplicados en `matches` por reprogramación o partidos re-disputados**: el constraint
-   único propuesto `(season_id, matchday, home_team_id, away_team_id)` asume que un mismo
-   par local/visitante no se repite dentro de la misma jornada. Esto puede romperse: el
-   Brasileirão tiene precedentes de partidos anulados y re-disputados por decisión del STJD
-   (ej. escándalo de manipulación de resultados en 2005, con partido replayed). Si eso
-   vuelve a pasar, el constraint tal como está rechazaría el segundo partido como duplicado
-   cuando en realidad es un partido distinto. No decidí cómo resolverlo (¿constraint más
-   laxo + resolución manual, ¿campo `replay_of_match_id`?) — queda para validar antes de
-   escribir la migración en 1.2.
+2. **Cambio de nombre o fusión de clubes → no se versiona.** El modelo predice usando
+   `team_id`, nunca el nombre, así que esto es puramente cosmético/de reporting. Construir
+   `team_name_history` ahora sería over-engineering para un problema que no tenemos todavía.
+   `official_name` guarda el nombre actual y se aplica retroactivamente en cualquier vista.
+   Si en Fase 11 (dashboard) hace falta precisión histórica, se agrega ahí — no bloquea nada
+   del pipeline de predicción.
 
-4. **Deduplicación *entre* fuentes**: `match_external_ids`/`team_external_ids` resuelven
-   "¿este ID de football-data.org ya lo tengo mapeado?", pero no resuelven el problema más
-   difícil de "¿este partido de API-Football es el mismo que ya ingerí desde
-   football-data.org, si nunca tuve su ID de esa fuente?" — eso requiere
-   heurística de matching (mismas fecha/equipos ± tolerancia), que es justamente lo que ya
-   está listado como Fase 2.4 ("Normalización de nombres/IDs entre fuentes"). Lo dejo
-   explícito acá para que no se asuma que las tablas de mapeo ya resuelven esa parte.
+3. **Partidos re-disputados (STJD) → se agregan `leg` y `replay_of_match_id` ahora.**
+   Es un caso raro, pero cambiar un constraint único con datos ya cargados es doloroso, así
+   que se deja el campo desde el día 1 aunque casi siempre valga `1`. Ver tabla `matches`
+   arriba.
 
-5. **`latitude`/`longitude` como NOT NULL en `venues`**: el prompt las pide sin marcarlas
-   nullable, así quedaron. Pero en la práctica, un fixture puede llegar con el nombre de una
-   sede que todavía no geocodificamos. ¿La ingesta debe geocodificar de forma síncrona antes
-   de insertar el `venue` (bloqueante), o permitimos insertar con coordenadas pendientes y
-   flaggear el registro para completar después? No lo decidí — afecta el diseño del pipeline
-   de Fase 2/3, no solo el esquema.
+4. **Deduplicación *entre* fuentes → confirmado que es Fase 2.4, no toca el esquema.**
+   `match_external_ids`/`team_external_ids` resuelven el mapeo directo por fuente; la
+   heurística de matching cuando no hay ID compartido (mismas fecha/equipos ± tolerancia)
+   queda fuera del esquema core, sin acción en este paso.
 
-6. **`matches.status` y resultados administrativos (W.O.)**: un partido decidido por
-   walkover/sanción administrativa (3-0 técnico) queda indistinguible de un resultado
-   jugado si solo usamos `finished` + `home_score`/`away_score`. Para un modelo de goles
-   esperados, mezclar ambos casos sin distinción podría meter ruido. ¿Agregamos un flag
-   tipo `decided_by_admin` o un valor de `status` adicional? Queda para Fase 4
-   (calidad de datos) pero prefiero dejarlo anotado ahora que estamos diseñando el esquema
-   base, en vez de tener que migrarlo después.
+5. **`latitude`/`longitude` → nullable.** La ingesta de fixtures no debe bloquearse
+   esperando geocodificación — el partido/venue se inserta igual y la sede se completa
+   después de forma asíncrona en Fase 3. No se agrega un campo de estado de geocoding
+   (YAGNI): un `NULL` ya comunica "pendiente".
+
+6. **Resultados administrativos (W.O./sanciones) → se agrega `result_type`.** Separado de
+   `status` (que sigue siendo el ciclo de vida scheduled/finished/postponed/cancelled),
+   `result_type` (`played` / `awarded_home` / `awarded_away` / `annulled`, default `played`)
+   evita que un resultado decidido administrativamente contamine en silencio el modelo de
+   goles esperados en Fase 6.
