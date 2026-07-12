@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     google_maps_api_key: str
     odds_api_key: str
 
+    log_level: str = "INFO"
+
     @property
     def database_url(self) -> str:
         return (
