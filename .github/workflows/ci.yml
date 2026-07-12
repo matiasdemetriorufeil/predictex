@@ -1,0 +1,84 @@
+name: CI
+
+"on":
+  push:
+  pull_request:
+
+env:
+  # Valores de prueba para los jobs de CI (servicios efímeros) — no son credenciales reales.
+  POSTGRES_USER: ci_user
+  POSTGRES_PASSWORD: ci_password
+  POSTGRES_DB: ci_test_db
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: "5432"
+  LOG_LEVEL: INFO
+  FOOTBALL_DATA_API_KEY: ci-placeholder
+  API_FOOTBALL_KEY: ci-placeholder
+  OPENWEATHER_API_KEY: ci-placeholder
+  GOOGLE_MAPS_API_KEY: ci-placeholder
+  ODDS_API_KEY: ci-placeholder
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint with ruff
+        run: uv run ruff check .
+
+      - name: Run unit tests (no integration)
+        run: uv run pytest -m "not integration"
+
+  integration-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        # Credenciales de prueba para el servicio efímero de Postgres en CI — no son secretos reales.
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_test_db
+        ports:
+          - 5432:5432
+        # GitHub Actions espera a que el servicio esté "healthy" antes de correr los steps del job.
+        options: >-
+          --health-cmd="pg_isready -U ci_user -d ci_test_db"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run integration tests
+        run: uv run pytest -m integration
