@@ -3,7 +3,7 @@
 Última actualización: 2026-07-12
 Referencia completa del plan: `docs/plan_maestro.md`
 
-**Próximo paso: 1.2**
+**Próximo paso: 1.3**
 
 ---
 
@@ -15,7 +15,7 @@ Referencia completa del plan: `docs/plan_maestro.md`
 
 ## Fase 1 — Diseño de la base de datos (core)
 - [x] 1.1 Esquema relacional core: Teams, Seasons, Venues, Matches, Season_Teams (`docs/schema_core.md`)
-- [ ] 1.2 Modelos ORM (SQLAlchemy) + migración inicial con Alembic (fusionados: Alembic autogenera desde los modelos, no al revés)
+- [x] 1.2 Modelos ORM (SQLAlchemy) + migración inicial con Alembic (`src/data/models.py`, `alembic/versions/`)
 - [ ] 1.3 Script de validación del esquema (sanity checks)
 
 ## Fase 2 — Ingesta de datos históricos (bootstrap)

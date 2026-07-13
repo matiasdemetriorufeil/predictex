@@ -11,11 +11,11 @@ medida que se ingieren esos datos (clima, distancias, cuotas, features, etc.).
 
 > Este documento incluye una ronda de revisión: las preguntas originales quedaron
 > resueltas y estas versiones de las tablas ya reflejan esas decisiones (ver
-> "Decisiones de diseño (post-revisión)" al final).
+> "Decisiones finales" al final).
 
-Es puramente un documento de diseño: no hay SQL, migraciones de Alembic ni modelos
-SQLAlchemy todavía. Eso es Paso 1.2 y 1.3 respectivamente, y no deberían implementarse hasta
-que este diseño esté validado.
+Este diseño ya está implementado: los modelos SQLAlchemy viven en `src/data/models.py` y la
+migración inicial en `alembic/versions/` (Paso 1.2). El script de validación de sanity
+checks sobre estas tablas es Paso 1.3 y todavía no existe.
 
 ## Resolución de IDs externos multi-fuente
 
@@ -82,6 +82,8 @@ introducir después sobre datos ya cargados.
 | `id` | BIGINT | NO | PK | Identificador interno. |
 | `season_id` | BIGINT | NO | FK → `seasons.id` | Temporada. |
 | `team_id` | BIGINT | NO | FK → `teams.id` | Equipo confirmado como participante de esa temporada. |
+| `confirmed_at` | TIMESTAMPTZ | YES | | Cuándo se confirmó la participación (ej. al publicarse el fixture oficial). Nullable si se carga retroactivamente sin ese dato. |
+| `source` | VARCHAR(30) | YES | | De dónde se confirmó la participación (`football_data_org`, `api_football`, manual, etc.). Nullable por la misma razón. |
 
 Constraint: `UNIQUE(season_id, team_id)`.
 
@@ -192,6 +194,8 @@ erDiagram
         bigint id PK
         bigint season_id FK
         bigint team_id FK
+        timestamptz confirmed_at
+        varchar source
     }
 
     MATCHES {
@@ -225,11 +229,13 @@ erDiagram
     }
 ```
 
-## Decisiones de diseño (post-revisión)
+## Decisiones finales
 
-Las siguientes preguntas se plantearon en la primera versión de este documento y ya fueron
-resueltas. Se deja el registro de la decisión y su razón, no solo el resultado, para no tener
-que re-litigarlas más adelante.
+Las siguientes preguntas se plantearon en la primera versión de este documento y quedaron
+resueltas en la revisión de 1.1, ratificadas como definitivas para la implementación de 1.2.
+Se deja el registro de la decisión y su razón, no solo el resultado, para no tener que
+re-litigarlas más adelante. Las tablas de la sección "Tablas" arriba ya reflejan estos
+cambios (incluyendo `season_teams.confirmed_at`/`source`, agregados en esta ronda).
 
 1. **Ascenso/descenso de equipos → se agrega `season_teams`.** Sin ella, "el equipo no jugó
    esta Série A" y "todavía no cargamos sus partidos" son indistinguibles, y esa ambigüedad
