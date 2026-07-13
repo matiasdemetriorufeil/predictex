@@ -3,7 +3,7 @@
 Última actualización: 2026-07-12
 Referencia completa del plan: `docs/plan_maestro.md`
 
-**Próximo paso: 1.3**
+**Próximo paso: 2.1**
 
 ---
 
@@ -13,10 +13,10 @@ Referencia completa del plan: `docs/plan_maestro.md`
 - [x] 0.3 Logging y jerarquía de excepciones estándar del proyecto
 - [x] 0.4 CI básico (GitHub Actions) corriendo pytest en cada push
 
-## Fase 1 — Diseño de la base de datos (core)
+## Fase 1 — Diseño de la base de datos (core) ✅ completa
 - [x] 1.1 Esquema relacional core: Teams, Seasons, Venues, Matches, Season_Teams (`docs/schema_core.md`)
 - [x] 1.2 Modelos ORM (SQLAlchemy) + migración inicial con Alembic (`src/data/models.py`, `alembic/versions/`)
-- [ ] 1.3 Script de validación del esquema (sanity checks)
+- [x] 1.3 Script de validación del esquema (`src/data/schema_validation.py`, `uv run python -m src.data.schema_validation`)
 
 ## Fase 2 — Ingesta de datos históricos (bootstrap)
 - [ ] 2.1 Importación de dataset histórico (Kaggle/GitHub)
