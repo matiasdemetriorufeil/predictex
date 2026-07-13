@@ -3,7 +3,7 @@
 Última actualización: 2026-07-13
 Referencia completa del plan: `docs/plan_maestro.md`
 
-**Próximo paso: 2.3**
+**Próximo paso: 2.4**
 
 ---
 
@@ -29,8 +29,14 @@ Referencia completa del plan: `docs/plan_maestro.md`
       partidos: 177 finished, 202 scheduled, 1 postponed) cargadas. No persiste standings
       (anti-leakage). 24 equipos nuevos sin match de nombre (20 en 2025, 4 nuevos en 2026 -
       promovidos), a reconciliar en 2.4.
-- [ ] 2.3 Cliente API-Football (stats de equipo, lineups)
-- [ ] 2.4 Normalización de nombres/IDs de equipos entre fuentes
+- [x] 2.3 Cliente API-Football (`src/ingestion/api_football_client.py`, `api_football_ingest.py`)
+      — SOLO team stats agregadas (lineups por fixture explícitamente fuera de alcance,
+      evaluar en/después de Fase 6). league_id=71 confirmado con llamada real. Cobertura
+      real limitada por el plan free a 2023-2024 (2025/2026 rechazados por la API) — queda
+      documentado en `docs/schema_core.md` como hueco a evaluar tras Fase 6. 40 stats
+      cargadas (20 equipos × 2 temporadas), 5 equipos nuevos sin match, a sumar a 2.4.
+- [ ] 2.4 Normalización de nombres/IDs de equipos entre fuentes (acumulado: 24 de
+      football-data.org + 5 de API-Football = 29 equipos a reconciliar)
 - [ ] 2.5 Script de ingesta incremental (partidos nuevos, programable)
 
 ## Fase 3 — Datos complementarios de bajo costo

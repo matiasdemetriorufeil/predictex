@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -65,6 +66,9 @@ class Team(Base):
     away_matches: Mapped[list[Match]] = relationship(
         foreign_keys="Match.away_team_id", back_populates="away_team"
     )
+    season_stats_raw: Mapped[list[TeamSeasonStatsRaw]] = relationship(
+        back_populates="team", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"Team(id={self.id!r}, short_name={self.short_name!r})"
@@ -83,6 +87,9 @@ class Season(Base):
         back_populates="season", cascade="all, delete-orphan"
     )
     season_teams: Mapped[list[SeasonTeam]] = relationship(
+        back_populates="season", cascade="all, delete-orphan"
+    )
+    team_stats_raw: Mapped[list[TeamSeasonStatsRaw]] = relationship(
         back_populates="season", cascade="all, delete-orphan"
     )
 
@@ -223,4 +230,34 @@ class MatchExternalId(Base):
         return (
             f"MatchExternalId(match_id={self.match_id!r}, source={self.source!r}, "
             f"external_id={self.external_id!r})"
+        )
+
+
+class TeamSeasonStatsRaw(Base):
+    __tablename__ = "team_season_stats_raw"
+    __table_args__ = (
+        UniqueConstraint(
+            "team_id", "season_id", "source", name="uq_team_season_stats_raw_team_season_source"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("teams.id"), nullable=False, index=True
+    )
+    season_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("seasons.id"), nullable=False, index=True
+    )
+    source: Mapped[str] = mapped_column(String(30), nullable=False)
+    # Stored as-is from the API, unnormalized on purpose - see docs/schema_core.md for why.
+    raw_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    fetched_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    team: Mapped[Team] = relationship(back_populates="season_stats_raw")
+    season: Mapped[Season] = relationship(back_populates="team_stats_raw")
+
+    def __repr__(self) -> str:
+        return (
+            f"TeamSeasonStatsRaw(team_id={self.team_id!r}, season_id={self.season_id!r}, "
+            f"source={self.source!r})"
         )

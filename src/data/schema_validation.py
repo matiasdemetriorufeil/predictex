@@ -33,6 +33,7 @@ EXPECTED_TABLES: tuple[str, ...] = (
     "season_teams",
     "team_external_ids",
     "match_external_ids",
+    "team_season_stats_raw",
 )
 
 # (column_name, nullable) per table, matching docs/schema_core.md.
@@ -96,6 +97,14 @@ EXPECTED_COLUMNS: dict[str, tuple[tuple[str, bool], ...]] = {
         ("source", False),
         ("external_id", False),
     ),
+    "team_season_stats_raw": (
+        ("id", False),
+        ("team_id", False),
+        ("season_id", False),
+        ("source", False),
+        ("raw_json", False),
+        ("fetched_at", False),
+    ),
 }
 
 # (column_name, ref_table, ref_column) per table.
@@ -114,6 +123,10 @@ EXPECTED_FOREIGN_KEYS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
     "team_external_ids": (("team_id", "teams", "id"),),
     "match_external_ids": (("match_id", "matches", "id"),),
+    "team_season_stats_raw": (
+        ("team_id", "teams", "id"),
+        ("season_id", "seasons", "id"),
+    ),
 }
 
 # Sets of columns covered by a UNIQUE constraint, per table.
@@ -129,6 +142,7 @@ EXPECTED_UNIQUE_CONSTRAINTS: dict[str, tuple[frozenset[str], ...]] = {
         frozenset({"match_id", "source"}),
         frozenset({"source", "external_id"}),
     ),
+    "team_season_stats_raw": (frozenset({"team_id", "season_id", "source"}),),
 }
 
 

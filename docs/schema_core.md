@@ -24,6 +24,11 @@ checks sobre estas tablas es Paso 1.3.
 > `venues.city`, y agrega `teams.state` (VARCHAR(2)) para guardar la UF. Las tablas abajo ya
 > reflejan este cambio.
 
+> **Enmienda de Paso 2.3**: se agregó `team_season_stats_raw` (otra migración incremental)
+> para guardar el JSON crudo de estadísticas agregadas de equipo por temporada de
+> API-Football, sin normalizar a columnas todavía. Ver esa tabla más abajo para la
+> justificación completa.
+
 ## Resolución de IDs externos multi-fuente
 
 **Decisión: tabla separada (`team_external_ids`, `match_external_ids`) en vez de columnas
@@ -146,6 +151,39 @@ escalable sin tocar el esquema core).
 
 Constraints: `UNIQUE(match_id, source)`, `UNIQUE(source, external_id)`.
 
+### `team_season_stats_raw` (agregada en Paso 2.3)
+
+| Columna | Tipo | Nullable | Key | Descripción |
+|---|---|---|---|---|
+| `id` | BIGINT | NO | PK | Identificador interno. |
+| `team_id` | BIGINT | NO | FK → `teams.id` | Equipo al que pertenecen las estadísticas. |
+| `season_id` | BIGINT | NO | FK → `seasons.id` | Temporada de las estadísticas. |
+| `source` | VARCHAR(30) | NO | | Fuente externa, ej. `api-football`. |
+| `raw_json` | JSONB | NO | | Respuesta cruda de `/teams/statistics`, sin normalizar. |
+| `fetched_at` | TIMESTAMPTZ | NO | | Cuándo se hizo la llamada que generó este registro. |
+
+Constraint: `UNIQUE(team_id, season_id, source)` (permite upsert por equipo/temporada/fuente).
+
+**Por qué JSON crudo y no columnas normalizadas**: la respuesta de `/teams/statistics` trae
+del orden de 30 campos (posesión, remates, pases, tarjetas, córners, forma reciente, goles
+por rango horario, etc.), y todavía no sabemos cuáles de esos campos van a terminar siendo
+features reales — esa decisión se toma en Fase 5 con evidencia (mejora medible de
+log-loss/Brier score contra el baseline), no ahora por intuición. Normalizar a columnas hoy
+implicaría adivinar el esquema final y migrar de nuevo cuando cambie. Guardar el JSON tal
+cual permite re-parsear localmente si más adelante se decide usar un campo distinto, en vez
+de tener que volver a consultar una API con cuota diaria limitada (100 req/día en el free
+tier) por un campo que ya habíamos traído y descartado.
+
+**Límite real descubierto en Paso 2.3 — cobertura 2023-2024 únicamente**: el plan free de
+API-Football rechaza explícitamente `/teams` y `/teams/statistics` para 2025 y 2026
+("Free plans do not have access to this season, try from 2022 to 2024"), y 2022 dio 0
+resultados en la práctica. Por ahora `team_season_stats_raw` solo tiene datos de **2023 y
+2024** — las temporadas 2025/2026 (las que más importan para predecir partidos actuales)
+quedan **sin estadísticas de equipo de esta fuente** hasta que se evalúe pagar un plan
+superior. Esa decisión se toma después de tener el modelo baseline funcionando (Fase 6), no
+ahora — no hay evidencia todavía de que estas features aporten sobre el baseline como para
+justificar el costo.
+
 ### ⚠️ Anti-leakage (regla no negociable de CLAUDE.md)
 
 `matches` es la única fuente de verdad de resultados y calendario. **Ninguna tabla derivada
@@ -170,6 +208,8 @@ erDiagram
     TEAMS ||--o{ TEAM_EXTERNAL_IDS : "tiene"
     MATCHES ||--o{ MATCH_EXTERNAL_IDS : "tiene"
     MATCHES ||--o{ MATCHES : "es replay de (replay_of_match_id)"
+    TEAMS ||--o{ TEAM_SEASON_STATS_RAW : "tiene"
+    SEASONS ||--o{ TEAM_SEASON_STATS_RAW : "tiene"
 
     TEAMS {
         bigint id PK
@@ -235,6 +275,15 @@ erDiagram
         bigint match_id FK
         varchar source
         varchar external_id
+    }
+
+    TEAM_SEASON_STATS_RAW {
+        bigint id PK
+        bigint team_id FK
+        bigint season_id FK
+        varchar source
+        jsonb raw_json
+        timestamptz fetched_at
     }
 ```
 
