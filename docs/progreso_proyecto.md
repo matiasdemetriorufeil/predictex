@@ -1,9 +1,9 @@
 # Progreso — Sistema de Predicción Brasileirão Série A
 
-Última actualización: 2026-07-12
+Última actualización: 2026-07-13
 Referencia completa del plan: `docs/plan_maestro.md`
 
-**Próximo paso: 2.2**
+**Próximo paso: 2.3**
 
 ---
 
@@ -24,7 +24,11 @@ Referencia completa del plan: `docs/plan_maestro.md`
 - [x] 2.1 Importación de dataset histórico desde GitHub (`adaoduque/Brasileirao_Dataset`,
       `src/ingestion/bootstrap_historical.py`) — 22 temporadas (2003-2024), 45 equipos,
       167 venues, 8782 partidos cargados contra la base real.
-- [ ] 2.2 Cliente API football-data.org (fixtures, resultados, tabla)
+- [x] 2.2 Cliente API football-data.org (`src/ingestion/football_data_client.py`,
+      `football_data_mapper.py`) — temporadas 2025 (380 partidos, finished) y 2026 (380
+      partidos: 177 finished, 202 scheduled, 1 postponed) cargadas. No persiste standings
+      (anti-leakage). 24 equipos nuevos sin match de nombre (20 en 2025, 4 nuevos en 2026 -
+      promovidos), a reconciliar en 2.4.
 - [ ] 2.3 Cliente API-Football (stats de equipo, lineups)
 - [ ] 2.4 Normalización de nombres/IDs de equipos entre fuentes
 - [ ] 2.5 Script de ingesta incremental (partidos nuevos, programable)
