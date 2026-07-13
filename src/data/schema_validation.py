@@ -41,7 +41,8 @@ EXPECTED_COLUMNS: dict[str, tuple[tuple[str, bool], ...]] = {
         ("id", False),
         ("official_name", False),
         ("short_name", False),
-        ("city", False),
+        ("city", True),
+        ("state", True),
         ("founded_year", True),
         ("home_venue_id", True),
     ),
@@ -55,7 +56,7 @@ EXPECTED_COLUMNS: dict[str, tuple[tuple[str, bool], ...]] = {
     "venues": (
         ("id", False),
         ("name", False),
-        ("city", False),
+        ("city", True),
         ("capacity", True),
         ("latitude", True),
         ("longitude", True),

@@ -3,7 +3,7 @@
 Última actualización: 2026-07-12
 Referencia completa del plan: `docs/plan_maestro.md`
 
-**Próximo paso: 2.1**
+**Próximo paso: 2.2**
 
 ---
 
@@ -17,9 +17,13 @@ Referencia completa del plan: `docs/plan_maestro.md`
 - [x] 1.1 Esquema relacional core: Teams, Seasons, Venues, Matches, Season_Teams (`docs/schema_core.md`)
 - [x] 1.2 Modelos ORM (SQLAlchemy) + migración inicial con Alembic (`src/data/models.py`, `alembic/versions/`)
 - [x] 1.3 Script de validación del esquema (`src/data/schema_validation.py`, `uv run python -m src.data.schema_validation`)
+  - Enmienda en 2.1: `teams.city`/`venues.city` pasaron a nullable y se agregó `teams.state`
+    (migración incremental `8710345d53dc`), porque el dataset de bootstrap no trae ciudad exacta.
 
 ## Fase 2 — Ingesta de datos históricos (bootstrap)
-- [ ] 2.1 Importación de dataset histórico (Kaggle/GitHub)
+- [x] 2.1 Importación de dataset histórico desde GitHub (`adaoduque/Brasileirao_Dataset`,
+      `src/ingestion/bootstrap_historical.py`) — 22 temporadas (2003-2024), 45 equipos,
+      167 venues, 8782 partidos cargados contra la base real.
 - [ ] 2.2 Cliente API football-data.org (fixtures, resultados, tabla)
 - [ ] 2.3 Cliente API-Football (stats de equipo, lineups)
 - [ ] 2.4 Normalización de nombres/IDs de equipos entre fuentes

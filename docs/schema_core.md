@@ -15,7 +15,14 @@ medida que se ingieren esos datos (clima, distancias, cuotas, features, etc.).
 
 Este diseño ya está implementado: los modelos SQLAlchemy viven en `src/data/models.py` y la
 migración inicial en `alembic/versions/` (Paso 1.2). El script de validación de sanity
-checks sobre estas tablas es Paso 1.3 y todavía no existe.
+checks sobre estas tablas es Paso 1.3.
+
+> **Enmienda de Paso 2.1**: al bootstrapear datos históricos desde el dataset de GitHub
+> (`adaoduque/Brasileirao_Dataset`) se descubrió que ese dataset no trae ciudad exacta para
+> equipos ni estadios, solo la UF (unidad federativa) del club. Se aplicó una migración
+> incremental (no se tocó la migración inicial ya corrida) que vuelve nullable `teams.city` y
+> `venues.city`, y agrega `teams.state` (VARCHAR(2)) para guardar la UF. Las tablas abajo ya
+> reflejan este cambio.
 
 ## Resolución de IDs externos multi-fuente
 
@@ -43,7 +50,8 @@ no es una operación de path caliente (se usa en ingesta, no en serving de predi
 | `id` | BIGINT | NO | PK | Identificador interno, generado por la base. |
 | `official_name` | VARCHAR(150) | NO | | Nombre oficial completo del club (ej. "Sport Club Corinthians Paulista"). |
 | `short_name` | VARCHAR(50) | NO | | Nombre corto/popular usado en tablas y UI (ej. "Corinthians"). |
-| `city` | VARCHAR(100) | NO | | Ciudad sede del club. |
+| `city` | VARCHAR(100) | YES | | Ciudad sede del club. Nullable desde Fase 2.1: el bootstrap histórico (dataset de GitHub) no trae nombre de ciudad, solo UF — se completa cuando ingerimos football-data.org/API-Football (2.2/2.3) o geocoding (Fase 3). |
+| `state` | VARCHAR(2) | YES | | UF (unidad federativa) del club, ej. "SP", "RJ". Agregada en Fase 2.1 porque el dataset de bootstrap sí trae esto, a diferencia de la ciudad exacta. |
 | `founded_year` | SMALLINT | YES | | Año de fundación, si está disponible en la fuente. |
 | `home_venue_id` | BIGINT | YES | FK → `venues.id` | Estadio principal. Nullable porque puede no conocerse al momento de crear el equipo. |
 
@@ -93,7 +101,7 @@ Constraint: `UNIQUE(season_id, team_id)`.
 |---|---|---|---|---|
 | `id` | BIGINT | NO | PK | Identificador interno. |
 | `name` | VARCHAR(150) | NO | | Nombre del estadio. |
-| `city` | VARCHAR(100) | NO | | Ciudad donde está ubicado. |
+| `city` | VARCHAR(100) | YES | | Ciudad donde está ubicado. Nullable desde Fase 2.1 por el mismo motivo que `teams.city`: el bootstrap histórico solo trae el nombre del estadio, no su ciudad. |
 | `capacity` | INTEGER | YES | | Capacidad de público, si se conoce. |
 | `latitude` | NUMERIC(9,6) | YES | | Para cálculo de distancias vía Google Maps en Fase 3. Nullable: la ingesta de fixtures no debe bloquearse esperando geocodificación — se completa después de forma asíncrona en Fase 3. |
 | `longitude` | NUMERIC(9,6) | YES | | Ídem. |
@@ -168,6 +176,7 @@ erDiagram
         varchar official_name
         varchar short_name
         varchar city
+        varchar state
         smallint founded_year
         bigint home_venue_id FK
     }

@@ -26,7 +26,7 @@ class Venue(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     capacity: Mapped[int | None] = mapped_column(nullable=True)
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
@@ -45,7 +45,8 @@ class Team(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     official_name: Mapped[str] = mapped_column(String(150), nullable=False)
     short_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    city: Mapped[str] = mapped_column(String(100), nullable=False)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(2), nullable=True)
     founded_year: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     home_venue_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("venues.id"), nullable=True, index=True
